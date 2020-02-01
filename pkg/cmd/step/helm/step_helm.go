@@ -203,27 +203,27 @@ func (o *StepHelmOptions) cloneProwPullRequest(dir, gitProvider string) (string,
 	if err != nil {
 		return "", err
 	}
-	exists, err := util.FileExists(filepath.Join(dir, "env"))
-	if err != nil {
-		return "", err
+
+	envDir := filepath.Join(dir, "env")
+	if _, err := os.Stat(envDir); os.IsNotExist(err) {
+		return dir, nil
+	} else if err != nil {
+		return "", errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", envDir)
 	}
-	if exists {
-		dir = filepath.Join(dir, "env")
-	}
-	return dir, nil
+	return envDir, nil
 }
 
 func (o *StepHelmOptions) discoverValuesFiles(dir string) ([]string, error) {
-	valuesFiles := []string{}
+	var valuesFiles []string
 	for _, name := range []string{"values.yaml", helm.SecretsFileName, "myvalues.yaml"} {
 		path := filepath.Join(dir, name)
-		exists, err := util.FileExists(path)
-		if err != nil {
-			return valuesFiles, err
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return []string{}, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", path)
 		}
-		if exists {
-			valuesFiles = append(valuesFiles, path)
-		}
+
+		valuesFiles = append(valuesFiles, path)
 	}
 	return valuesFiles, nil
 }
@@ -290,13 +290,11 @@ func (o *StepHelmOptions) verifyRequirementsYAML(resolver *versionstream.Version
 
 func (o *StepHelmOptions) replaceMissingVersionsFromVersionStream(requirementsConfig *config.RequirementsConfig, dir string) error {
 	fileName := filepath.Join(dir, helm.RequirementsFileName)
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return errors.Wrapf(err, "failed to check for file %s", fileName)
-	}
-	if !exists {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		log.Logger().Infof("No requirements file: %s so not checking for missing versions\n", fileName)
 		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
 
 	vs := requirementsConfig.VersionStream
@@ -348,17 +346,14 @@ func (o *StepHelmOptions) overwriteProviderValues(requirements *config.Requireme
 		return valuesData, nil
 	}
 	valuesTmplYamlFile := filepath.Join(providersValuesDir, provider, "values.tmpl.yaml")
-	exists, err := util.FileExists(valuesTmplYamlFile)
-	if err != nil {
-		return valuesData, errors.Wrapf(err, "failed to check if file exists: %s", valuesTmplYamlFile)
-	}
 	log.Logger().Infof("Applying the kubernetes overrides at %s\n", util.ColorInfo(valuesTmplYamlFile))
-
-	if !exists {
+	if _, err := os.Stat(valuesTmplYamlFile); os.IsNotExist(err) {
 		log.Logger().Warnf("No provider specific values overrides exist in file %s\n", valuesTmplYamlFile)
 		return valuesData, nil
-
+	} else if err != nil {
+		return valuesData, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", valuesTmplYamlFile)
 	}
+
 	funcMap, err := o.createFuncMap(requirements)
 	if err != nil {
 		return valuesData, err

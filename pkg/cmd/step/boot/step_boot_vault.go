@@ -108,7 +108,7 @@ func (o *StepBootVaultOptions) Run() error {
 		return errors.Wrapf(err, "unable to install Vault operator")
 	}
 
-	_, err = o.verifyVaultIngress(requirements, kubeClient, ns, requirements.Vault.Name)
+	_, err = o.verifyVaultIngress(requirements, ns, requirements.Vault.Name)
 	if err != nil {
 		return err
 	}
@@ -301,16 +301,15 @@ func (o *StepBootVaultOptions) createIngressConfig(requirements *config.Requirem
 }
 
 // verifyVaultIngress verifies there is a Vault ingress and if not create one if there is a file at
-func (o *StepBootVaultOptions) verifyVaultIngress(requirements *config.RequirementsConfig, kubeClient kubernetes.Interface, ns string, systemVaultName string) (bool, error) {
+func (o *StepBootVaultOptions) verifyVaultIngress(requirements *config.RequirementsConfig, ns string, systemVaultName string) (bool, error) {
 	fileName := filepath.Join(o.Dir, "vault-ing.tmpl.yaml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to check if file exists %s", fileName)
-	}
-	if !exists {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		log.Logger().Warnf("failed to find file %s\n", fileName)
 		return false, nil
+	} else if err != nil {
+		return false, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
+
 	data, err := readYamlTemplate(fileName, requirements)
 	if err != nil {
 		return true, errors.Wrapf(err, "failed to load vault ingress template file %s", fileName)

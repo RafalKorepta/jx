@@ -43,7 +43,19 @@ func FileExists(path string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return true, errors.Wrapf(err, "failed to check if file exists %s", path)
+	return false, errors.Wrapf(err, "failed to check if file exists %s", path)
+}
+
+// FileExists checks if path exists and is a file
+func FileExists2(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err != nil && os.IsNotExist(err) {
+		return false, errors.Errorf("the file does not exists %s", path)
+	}
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to check if file exists %s", path)
+	}
+	return true, nil
 }
 
 // DirExists checks if path exists and is a directory
@@ -58,18 +70,18 @@ func DirExists(path string) (bool, error) {
 }
 
 // FirstFileExists returns the first file which exists or an error if we can't detect if a file that exists
-func FirstFileExists(paths ...string) (string, error) {
-	for _, path := range paths {
-		exists, err := FileExists(path)
-		if err != nil {
-			return "", err
-		}
-		if exists {
-			return path, nil
-		}
-	}
-	return "", nil
-}
+//func FirstFileExists(paths ...string) (string, error) {
+//	for _, path := range paths {
+//		exists, err := FileExists(path)
+//		if err != nil {
+//			return "", err
+//		}
+//		if exists {
+//			return path, nil
+//		}
+//	}
+//	return "", nil
+//}
 
 // FileIsEmpty checks if a file is empty
 func FileIsEmpty(path string) (bool, error) {

@@ -4,6 +4,7 @@ package factory
 
 import (
 	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -17,8 +18,8 @@ import (
 	"github.com/jenkins-x/jx/pkg/cmd/clients"
 	"github.com/jenkins-x/jx/pkg/cmd/clients/fake"
 	"github.com/jenkins-x/jx/pkg/config"
-	"github.com/jenkins-x/jx/pkg/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,9 +30,8 @@ func TestNewBucketProviderFromTeamSettingsConfiguration(t *testing.T) {
 	assert.NoError(t, err)
 
 	requirementsYamlFile := path.Join("test_data", "jx-requirements.yml")
-	exists, err := util.FileExists(requirementsYamlFile)
-	assert.NoError(t, err)
-	assert.True(t, exists)
+	_, err = os.Stat(requirementsYamlFile)
+	require.NoError(t, err)
 
 	bytes, err := ioutil.ReadFile(requirementsYamlFile)
 	assert.NoError(t, err)

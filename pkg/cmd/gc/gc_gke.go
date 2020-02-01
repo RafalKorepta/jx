@@ -155,9 +155,12 @@ func (o *GCGKEOptions) Run() error {
 	}
 
 	path := util.UrlJoin(dir, "gc_gke.sh")
-	util.FileExists(path)
-
-	os.Remove(path)
+	if _, err = os.Stat(path); err == nil {
+		err = os.Remove(path)
+		if err != nil {
+			log.Logger().Warnf("The problem occurred when the %s file was deleted: %s", path, err)
+		}
+	}
 
 	message := `#!/bin/bash
 

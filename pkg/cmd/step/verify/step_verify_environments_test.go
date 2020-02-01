@@ -10,6 +10,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
+
 	v1 "github.com/jenkins-x/jx/pkg/apis/jenkins.io/v1"
 	"github.com/jenkins-x/jx/pkg/boot"
 	"github.com/jenkins-x/jx/pkg/cmd/clients/fake"
@@ -19,11 +24,6 @@ import (
 	"github.com/jenkins-x/jx/pkg/config"
 	"github.com/jenkins-x/jx/pkg/helm"
 	"github.com/jenkins-x/jx/pkg/util"
-
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/yaml"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestStepVerifyEnvironmentsOptions_StoreRequirementsInTeamSettings(t *testing.T) {
@@ -40,9 +40,8 @@ func TestStepVerifyEnvironmentsOptions_StoreRequirementsInTeamSettings(t *testin
 	}
 
 	requirementsYamlFile := path.Join("test_data", "verify_environments", "default", "jx-requirements.yml")
-	exists, err := util.FileExists(requirementsYamlFile)
-	assert.NoError(t, err)
-	assert.True(t, exists)
+	_, err := os.Stat(requirementsYamlFile)
+	require.NoError(t, err)
 
 	bytes, err := ioutil.ReadFile(requirementsYamlFile)
 	assert.NoError(t, err)
@@ -71,9 +70,8 @@ func TestStepVerifyEnvironmentsOptions_StoreRequirementsConfigMapWithModificatio
 	testhelpers.ConfigureTestOptions(options, options.Git(), options.Helm())
 
 	requirementsYamlFile := path.Join("test_data", "verify_environments", "ghe", "jx-requirements.yml")
-	exists, err := util.FileExists(requirementsYamlFile)
-	assert.NoError(t, err)
-	assert.True(t, exists)
+	_, err := os.Stat(requirementsYamlFile)
+	require.NoError(t, err)
 
 	bytes, err := ioutil.ReadFile(requirementsYamlFile)
 	assert.NoError(t, err)
@@ -208,9 +206,8 @@ func Test_ModifyPipelineGitEnvVars(t *testing.T) {
 	}()
 
 	testDir := path.Join("test_data", "verify_environments", "pipeline_git_env_vars")
-	exists, err := util.DirExists(testDir)
-	assert.NoError(t, err)
-	assert.True(t, exists)
+	_, err = os.Stat(testDir)
+	require.NoError(t, err)
 
 	err = util.CopyDir(testDir, dir, true)
 	assert.NoError(t, err)

@@ -2,11 +2,13 @@ package vault
 
 import (
 	"io/ioutil"
+	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	"github.com/jenkins-x/jx/pkg/config"
 	"github.com/jenkins-x/jx/pkg/util"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -19,8 +21,8 @@ const (
 func WriteYamlFiles(client Client, path string, files ...string) error {
 	secrets := map[string]string{}
 	for _, file := range files {
-		exists, err := util.FileExists(file)
-		if exists && err == nil {
+		_, err := os.Stat(file)
+		if err == nil {
 			empty, err := util.FileIsEmpty(file)
 			if !empty && err == nil {
 				content, err := ioutil.ReadFile(file)

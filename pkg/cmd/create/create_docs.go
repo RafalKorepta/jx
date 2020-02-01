@@ -84,15 +84,13 @@ func NewCmdCreateDocs(commonOpts *opts.CommonOptions) *cobra.Command {
 func (o *CreateDocsOptions) Run(jxCommand *cobra.Command) error {
 	dir := o.Dir
 
-	exists, err := util.FileExists(dir)
-	if err != nil {
-		return errors.Wrapf(err, "checking whether the file %q exists", dir)
-	}
-	if !exists {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		err := os.Mkdir(dir, util.DefaultWritePermissions)
 		if err != nil {
-			return fmt.Errorf("failed to create %s: %s", dir, err)
+			return errors.Wrapf(err, "failed to create %s", dir)
 		}
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", dir)
 	}
 
 	now := time.Now().Format(time.RFC3339)

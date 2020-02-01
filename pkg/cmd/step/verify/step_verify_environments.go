@@ -78,30 +78,29 @@ func (o *StepVerifyEnvironmentsOptions) Run() error {
 	}
 	info := util.ColorInfo
 
-	exists, err := util.FileExists(requirementsFileName)
-	if err != nil {
-		return err
-	}
-
 	envMap, names, err := kube.GetEnvironments(jxClient, ns)
 	if err != nil {
 		return errors.Wrapf(err, "failed to load Environments in namespace %s", ns)
 	}
 
-	if exists {
-		// lets store the requirements in the team settings now so that when we create the git auth provider
-		// we will be able to detect if we are using GitHub App secrets or not
-		err = o.storeRequirementsInTeamSettings(requirements)
-		if err != nil {
-			return err
-		}
-	} else {
+	if _, err = os.Stat(requirementsFileName); err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", requirementsFileName)
+	}
+
+	if os.IsNotExist(err) {
 		devEnv := envMap[kube.LabelValueDevEnvironment]
 		if devEnv != nil {
 			requirements, err = config.GetRequirementsConfigFromTeamSettings(&devEnv.Spec.TeamSettings)
 			if err != nil {
 				return errors.Wrap(err, "failed to load requirements from team settings")
 			}
+		}
+	} else {
+		// lets store the requirements in the team settings now so that when we create the git auth provider
+		// we will be able to detect if we are using GitHub App secrets or not
+		err = o.storeRequirementsInTeamSettings(requirements)
+		if err != nil {
+			return err
 		}
 	}
 

@@ -67,6 +67,6 @@ func assertServerUserPassword(t *testing.T, config *AuthConfig, serverURL string
 
 func TestLoadGitCredentialsFileDoesNotExist(t *testing.T) {
 	config, err := loadGitCredentialsAuthFile("test_data/does/not/exist")
-	require.NoError(t, err, "should not have failed to load non existing git creds file")
+	require.Error(t, err, "should have failed to load non existing git creds file")
 	assert.Nil(t, config, "should have returned nil config")
 }

@@ -3,9 +3,11 @@ package addon
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/jenkins-x/jx/pkg/util"
+	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
 )
 
@@ -27,14 +29,13 @@ func LoadAddonsConfig() (*AddonsConfig, error) {
 	if err != nil {
 		return config, err
 	}
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return config, err
+
+	if _, err = os.Stat(fileName); os.IsNotExist(err) {
+		return &AddonsConfig{}, nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
-	config = &AddonsConfig{}
-	if !exists {
-		return config, nil
-	}
+
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return config, fmt.Errorf("Failed to load file %s due to %s", fileName, err)

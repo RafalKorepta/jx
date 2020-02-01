@@ -2,6 +2,7 @@ package create
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -199,11 +200,10 @@ func (o *CreateQuickstartOptions) CreateQuickStart(q *quickstarts.QuickstartForm
 	}
 	if folder != "" {
 		chartsDir := filepath.Join(genDir, "charts", folder)
-		exists, err := util.FileExists(chartsDir)
-		if err != nil {
-			return err
+		if _, err = os.Stat(chartsDir); err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", chartsDir)
 		}
-		if exists {
+		if err == nil {
 			o.PostDraftPackCallback = func() error {
 				_, appName := filepath.Split(genDir)
 				appChartDir := filepath.Join(genDir, "charts", appName)

@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/jenkins-x/jx/pkg/cmd/create/options"
 
@@ -90,21 +93,23 @@ func (o *CreateEtcHostsOptions) Run() error {
 	if err != nil {
 		return err
 	}
+
 	urls, err := services.FindServiceURLs(client, ns)
 	if err != nil {
 		return err
 	}
-	exists, err := util.FileExists(name)
-	if err != nil {
-		return err
+
+	if _, err = os.Stat(name); os.IsNotExist(err) {
+		return errors.Errorf("hosts file %s does not exist!", name)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", name)
 	}
-	if !exists {
-		return fmt.Errorf("hosts file %s does not exist!", name)
-	}
+
 	data, err := ioutil.ReadFile(name)
 	if err != nil {
 		return err
 	}
+
 	text := string(data)
 	lines := strings.Split(text, "\n")
 	idx, ipLine := o.findIPLine(&lines)

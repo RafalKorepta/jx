@@ -213,42 +213,38 @@ func (o *StepPostBuildOptions) addImageIDtoHelmValues(imageID string) error {
 	}
 
 	charts := filepath.Join(pwd, "charts")
-	exists, err := util.FileExists(charts)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		return fmt.Errorf("no charts folder found are you in the root folder of your project?")
+	if _, err := os.Stat(charts); os.IsNotExist(err) {
+		return errors.Errorf("no charts folder found are you in the root folder of your project?")
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", charts)
 	}
 
 	// loop through all directories and if there's a values.yaml add image id to the end
-	err = filepath.Walk(charts, func(path string, f os.FileInfo, err error) error {
+	return filepath.Walk(charts, func(path string, f os.FileInfo, err error) error {
 
 		if f.IsDir() {
 			values := filepath.Join(path, "values.yaml")
-			valuesExist, err := util.FileExists(values)
+			if _, err := os.Stat(values); os.IsNotExist(err) {
+				return nil
+			} else if err != nil {
+				return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", values)
+			}
+
+			f, err := os.OpenFile(values, os.O_APPEND|os.O_WRONLY, 0600)
 			if err != nil {
 				return err
 			}
-			if valuesExist {
-				f, err := os.OpenFile(values, os.O_APPEND|os.O_WRONLY, 0600)
-				if err != nil {
-					return err
-				}
 
-				defer f.Close()
+			defer func() {
+				err = f.Close()
+				log.Logger().Warn(errors.Wrapf(err, "unexpected error occurred while closing the file %s", values))
+			}()
 
-				if _, err = f.WriteString(fmt.Sprintf(podAnnotations, imageID)); err != nil {
-					return err
-				}
+			if _, err = f.WriteString(fmt.Sprintf(podAnnotations, imageID)); err != nil {
+				return err
 			}
 
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }

@@ -597,14 +597,14 @@ func (o *StepBDDOptions) createCluster(cluster *CreateCluster) error {
 
 	// lets modify the local requirements file if it exists
 	requirements, requirementsFile, err := config.LoadRequirementsConfig(o.Flags.Dir)
+	//TODO RE THING LOAD REQUIREMENTS CONFIG !!!!
 	if err != nil {
 		return err
 	}
-	exists, err := util.FileExists(requirementsFile)
-	if err != nil {
-		return err
-	}
-	if exists {
+	_, err = os.Stat(requirementsFile)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", requirementsFile)
+	} else if err == nil {
 		// lets modify the version stream to use the PR
 		if o.Flags.VersionsRepoPr {
 			requirements.VersionStream.Ref = o.InstallOptions.Flags.VersionsGitRef

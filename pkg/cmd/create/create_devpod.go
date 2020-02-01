@@ -1054,15 +1054,14 @@ func (o *CreateDevPodOptions) guessDevPodLabel(dir string, labels []string) (str
 			return answer, nil
 		}
 		jenkinsfile := filepath.Join(root, "Jenkinsfile")
-		exists, err := util.FileExists(jenkinsfile)
-		if err != nil {
+		if _, err = os.Stat(jenkinsfile); err != nil {
 			return answer, errors.Wrapf(err, "could not find file: %s", jenkinsfile)
-		} else if exists {
-			answer, err = FindDevPodLabelFromJenkinsfile(jenkinsfile, labels)
-			if err != nil {
-				return answer, errors.Wrapf(err, "could not extract the pod template label from file: %s", jenkinsfile)
-			}
 		}
+		answer, err = FindDevPodLabelFromJenkinsfile(jenkinsfile, labels)
+		if err != nil {
+			return answer, errors.Wrapf(err, "could not extract the pod template label from file: %s", jenkinsfile)
+		}
+
 	}
 	return answer, nil
 }

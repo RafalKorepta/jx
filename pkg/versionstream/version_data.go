@@ -166,13 +166,12 @@ func GitURLToName(name string) string {
 // LoadStableVersionFile loads the stable version data from the given file name
 func LoadStableVersionFile(path string) (*StableVersion, error) {
 	version := &StableVersion{}
-	exists, err := util.FileExists(path)
-	if err != nil {
-		return version, errors.Wrapf(err, "failed to check if file exists %s", path)
-	}
-	if !exists {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return version, nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", path)
 	}
+
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return version, errors.Wrapf(err, "failed to load YAML file %s", path)
@@ -328,13 +327,12 @@ func UpdateStableVersion(dir string, kindStr string, name string, version string
 func GetRepositoryPrefixes(dir string) (*RepositoryPrefixes, error) {
 	answer := &RepositoryPrefixes{}
 	fileName := filepath.Join(dir, "charts", "repositories.yml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return answer, errors.Wrapf(err, "failed to find file %s", fileName)
-	}
-	if !exists {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return answer, nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
+
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return answer, errors.Wrapf(err, "failed to load file %s", fileName)
@@ -350,13 +348,12 @@ func GetRepositoryPrefixes(dir string) (*RepositoryPrefixes, error) {
 func GetQuickStarts(dir string) (*QuickStarts, error) {
 	answer := &QuickStarts{}
 	fileName := filepath.Join(dir, "quickstarts.yml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return answer, errors.Wrapf(err, "failed to find file %s", fileName)
-	}
-	if !exists {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return answer, nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
+
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return answer, errors.Wrapf(err, "failed to load file %s", fileName)

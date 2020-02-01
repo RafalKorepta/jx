@@ -296,13 +296,13 @@ func (o *StepSyntaxEffectiveOptions) CreateEffectivePipeline(packsDir string, pr
 	pipelineConfig := projectConfig.PipelineConfig
 	if name != "none" {
 		pipelineFile := filepath.Join(packDir, jenkinsfile.PipelineConfigFileName)
-		exists, err := util.FileExists(pipelineFile)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to find build pack pipeline YAML: %s", pipelineFile)
+		_, err := os.Stat(pipelineFile)
+		if os.IsNotExist(err) {
+			return nil, errors.Errorf("no build pack for %s exists at directory %s", name, packDir)
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", pipelineFile)
 		}
-		if !exists {
-			return nil, fmt.Errorf("no build pack for %s exists at directory %s", name, packDir)
-		}
+
 		pipelineConfig, err = jenkinsfile.LoadPipelineConfig(pipelineFile, resolver, true, false)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to load build pack pipeline YAML: %s", pipelineFile)
@@ -507,11 +507,9 @@ func (o *StepSyntaxEffectiveOptions) getDockerRegistry(projectConfig *config.Pro
 func (o *StepSyntaxEffectiveOptions) LoadProjectConfig(workingDir string) (*config.ProjectConfig, string, error) {
 	if o.Context != "" {
 		fileName := filepath.Join(workingDir, fmt.Sprintf("jenkins-x-%s.yml", o.Context))
-		exists, err := util.FileExists(fileName)
-		if err != nil {
-			return nil, fileName, errors.Wrapf(err, "failed to check if file exists %s", fileName)
-		}
-		if exists {
+		if _, err := os.Stat(fileName); err != nil && !os.IsNotExist(err) {
+			return nil, fileName, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
+		} else if err != nil {
 			config, err := config.LoadProjectConfigFile(fileName)
 			return config, fileName, err
 		}

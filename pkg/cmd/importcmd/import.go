@@ -1292,13 +1292,12 @@ func replacePlaceholdersInPathBase(replacer *strings.Replacer, path string) erro
 func (options *ImportOptions) addAppNameToGeneratedFile(filename, field, value string) error {
 	dir := filepath.Join(options.Dir, "charts", options.AppName)
 	file := filepath.Join(dir, filename)
-	exists, err := util.FileExists(file)
-	if err != nil {
-		return err
-	}
-	if !exists {
+	_, err := os.Stat(file)
+	if os.IsNotExist(err) {
 		// no file so lets ignore this
 		return nil
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", file)
 	}
 	input, err := ioutil.ReadFile(file)
 	if err != nil {

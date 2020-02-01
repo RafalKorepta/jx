@@ -9,6 +9,7 @@ import (
 	"github.com/jenkins-x/jx/pkg/packages"
 	"github.com/jenkins-x/jx/pkg/util"
 	"github.com/pborman/uuid"
+	"github.com/pkg/errors"
 )
 
 // InstallOc installs oc cli
@@ -68,12 +69,9 @@ func InstallOc() error {
 			return err
 		}
 		f := filepath.Join(zipDir, fileName)
-		exists, err := util.FileExists(f)
+		_, err = os.Stat(f)
 		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("Could not find file %s inside the downloaded oc.zip!", f)
+			return errors.Wrapf(err, "failed to check if file %s exists", f)
 		}
 		err = os.Rename(f, fullPath)
 		if err != nil {

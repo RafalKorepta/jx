@@ -3,6 +3,7 @@ package vault
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -150,12 +151,12 @@ func CreateVaultResourcesBoot(vaultParams ResourceCreationOpts) (*string, *strin
 
 	templatePath := filepath.Join(vaultParams.AWSTemplatesDir, vaultCloudFormationTemplateName)
 	log.Logger().Debugf("Attempting to read Vault CloudFormation template from path %s", templatePath)
-	exists, err := util.FileExists(templatePath)
-	if err != nil {
-		return nil, nil, nil, nil, nil, errors.Wrap(err, "there was a problem loading the vault_cf_tmpl.yml file")
-	} else if !exists {
-		return nil, nil, nil, nil, nil, fmt.Errorf("vault cloud formation template %s doesn't exist", templatePath)
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		return nil, nil, nil, nil, nil, errors.Errorf("vault cloud formation template %s doesn't exist", templatePath)
+	} else if err != nil {
+		return nil, nil, nil, nil, nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", templatePath)
 	}
+
 	templateBytes, err := ioutil.ReadFile(templatePath)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err

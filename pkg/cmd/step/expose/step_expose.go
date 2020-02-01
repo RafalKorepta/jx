@@ -3,6 +3,7 @@ package expose
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -147,12 +148,13 @@ func (o *StepExposeOptions) Run() error {
 			oldAnnotations[k] = v
 		}
 
-		ingress, err := o.createIngress(requirements, kubeClient, ns, &svc, o.IngressTemplate)
+		ingress, err := o.createIngress(requirements, &svc, o.IngressTemplate)
 		if err != nil {
 			return err
 		}
 
 		if ingress == nil {
+			log.Logger().Warnf("the %s does not exists", o.IngressTemplate)
 			continue
 		}
 		exposedURL, err := o.applyIngressAndUpdateService(kubeClient, ns, &svc, ingress)
@@ -175,15 +177,13 @@ func (o *StepExposeOptions) Run() error {
 }
 
 // creates an Ingres resource from a template if it exists
-func (o *StepExposeOptions) createIngress(requirements *config.RequirementsConfig, kubeClient kubernetes.Interface, ns string, service *corev1.Service, fileName string) (*v1beta1.Ingress, error) {
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to check if file exists %s", fileName)
-	}
-	if !exists {
-		log.Logger().Warnf("failed to find file %s\n", fileName)
+func (o *StepExposeOptions) createIngress(requirements *config.RequirementsConfig, service *corev1.Service, fileName string) (*v1beta1.Ingress, error) {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return nil, nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
+
 	data, err := readYamlTemplate(fileName, requirements, service)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load vault ingress template file %s", fileName)

@@ -892,22 +892,20 @@ func (o *PromoteOptions) findLatestVersion(app string) (string, error) {
 
 func (o *PromoteOptions) verifyHelmConfigured() error {
 	helmHomeDir := filepath.Join(util.HomeDir(), ".helm")
-	exists, err := util.FileExists(helmHomeDir)
-	if err != nil {
-		return err
-	}
-	if !exists {
+	if _, err := os.Stat(helmHomeDir); os.IsNotExist(err) {
 		log.Logger().Warnf("No helm home dir at %s so lets initialise helm client", helmHomeDir)
 
 		err = o.HelmInit("")
 		if err != nil {
 			return err
 		}
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", helmHomeDir)
 	}
 
-	_, ns, _ := o.KubeClientAndNamespace()
+	_, ns, err := o.KubeClientAndNamespace()
 	if err != nil {
-		return err
+		log.Logger().Warnf("Could not discover the kubernetes namespace: %s", err)
 	}
 
 	// lets add the releases chart

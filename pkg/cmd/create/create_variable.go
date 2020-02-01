@@ -1,7 +1,7 @@
 package create
 
 import (
-	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/jenkins-x/jx/pkg/cmd/create/options"
@@ -185,13 +185,12 @@ func (o *CreateVariableOptions) loadEnvVars(projectConfig *config.ProjectConfig)
 	if name != "none" {
 		packDir := filepath.Join(packsDir, name)
 		pipelineFile := filepath.Join(packDir, jenkinsfile.PipelineConfigFileName)
-		exists, err := util.FileExists(pipelineFile)
-		if err != nil {
-			return answer, errors.Wrapf(err, "failed to find build pack pipeline YAML: %s", pipelineFile)
+		if _, err := os.Stat(pipelineFile); os.IsNotExist(err) {
+			return nil, errors.Wrapf(err, "failed to find build pack pipeline YAML: %s", pipelineFile)
+		} else if err != nil {
+			return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", pipelineFile)
 		}
-		if !exists {
-			return answer, fmt.Errorf("no build pack for %s exists at directory %s", name, packDir)
-		}
+
 		buildPackPipelineConfig, err := jenkinsfile.LoadPipelineConfig(pipelineFile, resolver, true, false)
 		if err != nil {
 			return answer, errors.Wrapf(err, "failed to load build pack pipeline YAML: %s", pipelineFile)

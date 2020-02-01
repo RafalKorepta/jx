@@ -1,23 +1,22 @@
 package create
 
 import (
-	"fmt"
-
-	"github.com/jenkins-x/jx/pkg/cmd/create/options"
-
-	"github.com/jenkins-x/jx/pkg/cmd/helper"
-
 	"context"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
-
 	"strconv"
+	"strings"
 
 	randomdata "github.com/Pallinder/go-randomdata"
 	codeship "github.com/codeship/codeship-go"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	survey "gopkg.in/AlecAivazis/survey.v1"
+
+	"github.com/jenkins-x/jx/pkg/cmd/create/options"
+	"github.com/jenkins-x/jx/pkg/cmd/helper"
 	"github.com/jenkins-x/jx/pkg/cmd/opts"
 	"github.com/jenkins-x/jx/pkg/cmd/templates"
 	"github.com/jenkins-x/jx/pkg/gits"
@@ -25,8 +24,6 @@ import (
 	"github.com/jenkins-x/jx/pkg/log"
 	"github.com/jenkins-x/jx/pkg/util"
 	"github.com/jenkins-x/jx/pkg/version"
-	"github.com/spf13/cobra"
-	survey "gopkg.in/AlecAivazis/survey.v1"
 )
 
 type CreateCodeshipFlags struct {
@@ -228,7 +225,7 @@ func (o *CreateCodeshipOptions) Run() error {
 	var dir string
 
 	if !remoteRepoExists {
-		fmt.Fprintf(o.Out, "Creating Git repository %s/%s\n", util.ColorInfo(owner), util.ColorInfo(repoName))
+		log.Logger().Infof("Creating Git repository %s/%s\n", util.ColorInfo(owner), util.ColorInfo(repoName))
 
 		repo, err = details.CreateRepository()
 		if err != nil {
@@ -257,24 +254,16 @@ func (o *CreateCodeshipOptions) Run() error {
 			return err
 		}
 	} else {
-		fmt.Fprintf(o.Out, "Git repository %s/%s already exists\n", util.ColorInfo(owner), util.ColorInfo(repoName))
+		log.Logger().Infof("Git repository %s/%s already exists\n", util.ColorInfo(owner), util.ColorInfo(repoName))
 
 		dir = path.Join(organisationDir, details.RepoName)
-		localDirExists, err := util.FileExists(dir)
-		if err != nil {
-			return err
+		_, err = os.Stat(dir)
+		if err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", dir)
 		}
 
-		if localDirExists {
-			// if remote repo does exist & local does exist, git pull the local repo
-			fmt.Fprintf(o.Out, "local directory already exists\n")
-
-			err = o.Git().Pull(dir)
-			if err != nil {
-				return err
-			}
-		} else {
-			fmt.Fprintf(o.Out, "cloning repository locally\n")
+		if os.IsNotExist(err) {
+			log.Logger().Infof("cloning repository locally\n")
 			err = os.MkdirAll(dir, os.FileMode(0755))
 			if err != nil {
 				return err
@@ -286,6 +275,14 @@ func (o *CreateCodeshipOptions) Run() error {
 				return err
 			}
 			err = o.Git().Clone(pushGitURL, dir)
+			if err != nil {
+				return err
+			}
+		} else {
+			// if remote repo does exist & local does exist, git pull the local repo
+			log.Logger().Infof("local directory already exists\n")
+
+			err = o.Git().Pull(dir)
 			if err != nil {
 				return err
 			}
@@ -361,7 +358,7 @@ func (o *CreateCodeshipOptions) Run() error {
 		project, _, err := csOrg.CreateProject(ctx, createProjectRequest)
 
 		if err != nil {
-			return fmt.Errorf("failed to create project, check Codeship is configured to authenticate against your Git provider https://app.codeship.com/authentications.  error: %v", err)
+			return errors.Errorf("failed to create project, check Codeship is configured to authenticate against your Git provider https://app.codeship.com/authentications.  error: %v", err)
 		}
 
 		uuid = project.UUID

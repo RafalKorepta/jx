@@ -205,12 +205,10 @@ func (o *BootOptions) Run() error {
 			}
 		}
 
-		bootCloneExists, err := util.FileExists(cloneDir)
-		if err != nil {
-			return err
-		}
-		if bootCloneExists {
-			return fmt.Errorf("Cannot clone git repository to %s as the dir already exists. Maybe try 'cd %s' and re-run the 'jx boot' command?", repo, repo)
+		if _, err = os.Stat(cloneDir); os.IsNotExist(err) {
+			return errors.Errorf("Cannot clone git repository to %s as the dir already exists. Maybe try 'cd %s' and re-run the 'jx boot' command?", repo, repo)
+		} else if err != nil {
+			return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", cloneDir)
 		}
 
 		log.Logger().Infof("Cloning %s @ %s to %s\n", info(gitURL), info(gitRef), info(cloneDir))
@@ -262,13 +260,11 @@ func (o *BootOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		bootCloneExists, err = util.FileExists(pipelineFile)
-		if err != nil {
-			return err
-		}
 
-		if !bootCloneExists {
-			return fmt.Errorf("The cloned repository %s does not include a Jenkins X Pipeline file at %s", gitURL, pipelineFile)
+		if _, err = os.Stat(pipelineFile); os.IsNotExist(err) {
+			return errors.Errorf("The cloned repository %s does not include a Jenkins X Pipeline file at %s", gitURL, pipelineFile)
+		} else if err != nil {
+			return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", pipelineFile)
 		}
 	}
 
@@ -281,12 +277,10 @@ func (o *BootOptions) Run() error {
 		return errors.Wrap(err, "failed to load jx-requirements.yml file")
 	}
 
-	isBootClone, err = util.FileExists(requirementsFile)
-	if err != nil {
-		return err
-	}
-	if !isBootClone {
-		return fmt.Errorf("no requirements file %s are you sure you are running this command inside a GitOps clone?", requirementsFile)
+	if _, err = os.Stat(requirementsFile); os.IsNotExist(err) {
+		return errors.Errorf("no requirements file %s are you sure you are running this command inside a GitOps clone?", requirementsFile)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", requirementsFile)
 	}
 
 	// only update boot if the a GitRef has not been supplied
@@ -484,15 +478,18 @@ func (o *BootOptions) updateBootCloneIfOutOfDate(gitRef string) error {
 }
 
 func existingBootClone(pipelineFile string) (bool, error) {
-	pipelineExists, err := util.FileExists(pipelineFile)
-	if err != nil {
-		return false, err
+	if _, err := os.Stat(pipelineFile); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", pipelineFile)
 	}
-	requirementsExist, err := util.FileExists(config.RequirementsConfigFileName)
-	if err != nil {
-		return false, err
+
+	if _, err := os.Stat(config.RequirementsConfigFileName); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", config.RequirementsConfigFileName)
 	}
-	return requirementsExist && pipelineExists, nil
+	return true, nil
 }
 
 func (o *BootOptions) overrideRequirements(defaultBootConfigURL string) error {

@@ -1,42 +1,32 @@
 package create
 
 import (
-	"strings"
-
-	"github.com/jenkins-x/jx/pkg/cmd/create/options"
-
-	"github.com/jenkins-x/jx/pkg/features"
-
-	"github.com/jenkins-x/jx/pkg/cmd/helper"
-
 	"fmt"
-
-	os_user "os/user"
-
-	"strconv"
-
-	"errors"
-
-	"path/filepath"
-
 	"os"
-
+	os_user "os/user"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
-	"path"
-
 	"github.com/Pallinder/go-randomdata"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"gopkg.in/AlecAivazis/survey.v1"
+
 	"github.com/jenkins-x/jx/pkg/cloud"
 	"github.com/jenkins-x/jx/pkg/cloud/gke"
+	"github.com/jenkins-x/jx/pkg/cmd/create/options"
+	"github.com/jenkins-x/jx/pkg/cmd/helper"
 	"github.com/jenkins-x/jx/pkg/cmd/opts"
 	"github.com/jenkins-x/jx/pkg/cmd/templates"
+	"github.com/jenkins-x/jx/pkg/features"
 	"github.com/jenkins-x/jx/pkg/gits"
 	"github.com/jenkins-x/jx/pkg/kube"
 	"github.com/jenkins-x/jx/pkg/log"
 	"github.com/jenkins-x/jx/pkg/terraform"
 	"github.com/jenkins-x/jx/pkg/util"
-	"github.com/spf13/cobra"
-	"gopkg.in/AlecAivazis/survey.v1"
 )
 
 // Cluster interface for Clusters
@@ -450,15 +440,13 @@ func (options *TerraformGKEOptions) createOrganisationGitRepo() error {
 	var dir string
 
 	if options.Flags.LocalOrganisationRepository != "" {
-		exists, err := util.FileExists(options.Flags.LocalOrganisationRepository)
-		if err != nil {
-			return err
+		if _, err := os.Stat(options.Flags.LocalOrganisationRepository); os.IsNotExist(err) {
+			return errors.Errorf("unable to find local repository %s", options.Flags.LocalOrganisationRepository)
+		} else if err != nil {
+			return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", options.Flags.LocalOrganisationRepository)
 		}
-		if exists {
-			dir = options.Flags.LocalOrganisationRepository
-		} else {
-			return errors.New("unable to find local repository " + options.Flags.LocalOrganisationRepository)
-		}
+
+		dir = options.Flags.LocalOrganisationRepository
 	} else {
 		details, err := gits.PickNewOrExistingGitRepository(options.BatchMode, authConfigSvc,
 			defaultRepoName, &options.InstallOptions.GitRepositoryOptions, nil, nil, options.Git(), true, options.GetIOFileHandles())
@@ -509,20 +497,11 @@ func (options *TerraformGKEOptions) createOrganisationGitRepo() error {
 			log.Logger().Infof("Git repository %s/%s already exists", util.ColorInfo(owner), util.ColorInfo(repoName))
 
 			dir = path.Join(organisationDir, details.RepoName)
-			localDirExists, err := util.FileExists(dir)
-			if err != nil {
-				return err
+			if _, err := os.Stat(dir); err != nil && !os.IsNotExist(err) {
+				return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", dir)
 			}
 
-			if localDirExists {
-				// if remote repo does exist & local does exist, git pull the local repo
-				log.Logger().Infof("local directory already exists")
-
-				err = options.Git().Pull(dir)
-				if err != nil {
-					return err
-				}
-			} else {
+			if os.IsNotExist(err) {
 				log.Logger().Infof("cloning repository locally")
 				err = os.MkdirAll(dir, os.FileMode(0755))
 				if err != nil {
@@ -535,6 +514,14 @@ func (options *TerraformGKEOptions) createOrganisationGitRepo() error {
 					return err
 				}
 				err = options.Git().Clone(pushGitURL, dir)
+				if err != nil {
+					return err
+				}
+			} else {
+				// if remote repo does exist & local does exist, git pull the local repo
+				log.Logger().Infof("local directory already exists")
+
+				err = options.Git().Pull(dir)
 				if err != nil {
 					return err
 				}
@@ -601,35 +588,47 @@ func (options *TerraformGKEOptions) CreateOrganisationFolderStructure(dir string
 
 	log.Logger().Infof("Creating config for cluster %s", util.ColorInfo(c.Name()))
 
-	path := filepath.Join(dir, Clusters, c.Name(), Terraform)
-	exists, err := util.FileExists(path)
-	if err != nil {
-		return nil, fmt.Errorf("unable to check if existing folder exists for path %s: %v", path, err)
+	terraformFile := filepath.Join(dir, Clusters, c.Name(), Terraform)
+	_, err := os.Stat(terraformFile)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", terraformFile)
 	}
 
-	if !exists {
+	if os.IsNotExist(err) {
 		log.Logger().Debugf("cluster %s does not exist, creating...", c.Name())
 
-		os.MkdirAll(path, util.DefaultWritePermissions)
+		err = os.MkdirAll(terraformFile, util.DefaultWritePermissions)
+		if err != nil {
+			log.Logger().Warn(errors.Wrap(err, "creating terraform folder"))
+		}
 
-		options.Git().Clone(TerraformTemplatesGKE, path)
+		err = options.Git().Clone(TerraformTemplatesGKE, terraformFile)
+		if err != nil {
+			log.Logger().Warn(errors.Wrap(err, "cloning the gke terraform template"))
+		}
 		g := c.(*GKECluster)
 		//g := &GKECluster{}
 
-		err := options.configureGKECluster(g, path)
+		err := options.configureGKECluster(g, terraformFile)
 		if err != nil {
 			return nil, err
 		}
 		clusterDefinitions = append(clusterDefinitions, g)
 
-		os.RemoveAll(filepath.Join(path, ".git"))
-		os.RemoveAll(filepath.Join(path, ".gitignore"))
+		err = os.RemoveAll(filepath.Join(terraformFile, ".git"))
+		if err != nil {
+			log.Logger().Warn(errors.Wrap(err, "removing .git folder"))
+		}
+		err = os.RemoveAll(filepath.Join(terraformFile, ".gitignore"))
+		if err != nil {
+			log.Logger().Warn(errors.Wrap(err, "removing .gitignore"))
+		}
 	} else {
 		// if the directory already exists, try to load its config
 		log.Logger().Debugf("cluster %s already exists, loading...", c.Name())
 
 		g := c.(*GKECluster)
-		terraformVars := filepath.Join(path, "terraform.tfvars")
+		terraformVars := filepath.Join(terraformFile, "terraform.tfvars")
 		log.Logger().Infof("loading config from %s", util.ColorInfo(terraformVars))
 
 		g.ParseTfVarsFile(terraformVars)
@@ -644,9 +643,9 @@ func (options *TerraformGKEOptions) createClusters(dir string, clusterDefinition
 	for _, c := range clusterDefinitions {
 		switch v := c.(type) {
 		case *GKECluster:
-			path := filepath.Join(dir, Clusters, v.Name(), Terraform)
+			terraformFile := filepath.Join(dir, Clusters, v.Name(), Terraform)
 			log.Logger().Infof("Creating/Updating cluster %s", util.ColorInfo(c.Name()))
-			err := options.applyTerraformGKE(v, path)
+			err := options.applyTerraformGKE(v, terraformFile)
 			if err != nil {
 				return err
 			}
@@ -674,7 +673,12 @@ func (options *TerraformGKEOptions) writeGitIgnoreFile(dir string) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func() {
+			err = file.Close()
+			if err != nil {
+				log.Logger().Warn(errors.Wrap(err, "closing git ignore file"))
+			}
+		}()
 
 		_, err = file.WriteString("**/*.json\n.terraform\n**/*.tfstate\njx\n")
 		if err != nil {
@@ -798,7 +802,10 @@ func (options *TerraformGKEOptions) configureGKECluster(g *GKECluster, path stri
 				Default: false,
 				Help:    "Preemptible VMs can significantly lower the cost of a cluster",
 			}
-			survey.AskOne(prompt, &g.Preemptible, nil, surveyOpts)
+			err := survey.AskOne(prompt, &g.Preemptible, nil, surveyOpts)
+			if err != nil {
+				log.Logger().Warn(errors.Wrap(err, "survey input"))
+			}
 		}
 	}
 
@@ -818,7 +825,10 @@ func (options *TerraformGKEOptions) configureGKECluster(g *GKECluster, path stri
 				Default: false,
 				Help:    "Enables enhanced oauth scopes to allow access to storage based services",
 			}
-			survey.AskOne(prompt, &options.Flags.GKEUseEnhancedScopes, nil, surveyOpts)
+			err := survey.AskOne(prompt, &options.Flags.GKEUseEnhancedScopes, nil, surveyOpts)
+			if err != nil {
+				log.Logger().Warn(errors.Wrap(err, "survey input"))
+			}
 
 			if options.Flags.GKEUseEnhancedScopes {
 				g.DevStorageRole = devStorageFullControl
@@ -837,7 +847,10 @@ func (options *TerraformGKEOptions) configureGKECluster(g *GKECluster, path stri
 					Default: options.Flags.GKEUseEnhancedScopes,
 					Help:    "Enables extra APIs on the GCP project",
 				}
-				survey.AskOne(prompt, &options.Flags.GKEUseEnhancedApis, nil, surveyOpts)
+				err := survey.AskOne(prompt, &options.Flags.GKEUseEnhancedApis, nil, surveyOpts)
+				if err != nil {
+					log.Logger().Warn(errors.Wrap(err, "survey input"))
+				}
 			}
 		}
 
@@ -859,7 +872,10 @@ func (options *TerraformGKEOptions) configureGKECluster(g *GKECluster, path stri
 					Default: options.Flags.GKEUseEnhancedScopes,
 					Help:    "Use Kaniko for docker images",
 				}
-				survey.AskOne(prompt, &options.InstallOptions.Flags.Kaniko, nil, surveyOpts)
+				err := survey.AskOne(prompt, &options.InstallOptions.Flags.Kaniko, nil, surveyOpts)
+				if err != nil {
+					log.Logger().Warn(errors.Wrap(err, "survey input"))
+				}
 			}
 		}
 	}
@@ -918,7 +934,12 @@ func (options *TerraformGKEOptions) configureGKECluster(g *GKECluster, path stri
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer func() {
+			err = file.Close()
+			if err != nil {
+				log.Logger().Warn(errors.Wrap(err, "closing the terraform template file"))
+			}
+		}()
 
 		_, err = file.WriteString(storageBucket)
 		if err != nil {
@@ -1005,8 +1026,10 @@ func (options *TerraformGKEOptions) applyTerraformGKE(g *GKECluster, path string
 		prompt := &survey.Confirm{
 			Message: "Would you like to apply this plan?",
 		}
-		survey.AskOne(prompt, &confirm, nil, surveyOpts)
-
+		err = survey.AskOne(prompt, &confirm, nil, surveyOpts)
+		if err != nil {
+			log.Logger().Warn(errors.Wrap(err, "survey input"))
+		}
 		if !confirm {
 			// exit at this point
 			return nil
@@ -1122,7 +1145,7 @@ func (options *TerraformGKEOptions) installJx(c Cluster, clusters []Cluster) err
 
 		ns := options.InstallOptions.Flags.Namespace
 		if ns == "" {
-			_, ns, _ = options.KubeClientAndNamespace()
+			_, ns, err = options.KubeClientAndNamespace()
 			if err != nil {
 				return err
 			}

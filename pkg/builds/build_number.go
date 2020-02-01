@@ -45,21 +45,20 @@ func GetBuildNumberFromLabels(m map[string]string) string {
 func getDownwardAPILabelsMap() map[string]string {
 	// if we are in a knative build pod we can discover it via the Downward API if the `/etc/podinfo/labels` file exists
 	const podInfoLabelsFile = "/etc/podinfo/labels"
-	exists, err := util.FileExists(podInfoLabelsFile)
+	_, err := os.Stat(podInfoLabelsFile)
 	if err != nil {
 		log.Logger().Warnf("failed to detect if the file %s exists: %s", podInfoLabelsFile, err)
-	} else if exists {
-		data, err := ioutil.ReadFile(podInfoLabelsFile)
-		if err != nil {
-			log.Logger().Warnf("failed to load downward API pod labels from %s due to: %s", podInfoLabelsFile, err)
-		} else {
-			text := strings.TrimSpace(string(data))
-			if text != "" {
-				return LoadDownwardAPILabels(text)
-			}
-		}
+		return nil
 	}
-	return nil
+	data, err := ioutil.ReadFile(podInfoLabelsFile)
+	if err != nil {
+		log.Logger().Warnf("failed to load downward API pod labels from %s due to: %s", podInfoLabelsFile, err)
+	}
+	text := strings.TrimSpace(string(data))
+	if text == "" {
+		return nil
+	}
+	return LoadDownwardAPILabels(text)
 }
 
 // GetBranchName returns the branch name using environment variables and/or pod Downward API

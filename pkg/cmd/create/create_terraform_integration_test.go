@@ -3,6 +3,7 @@
 package create_test
 
 import (
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"path"
@@ -85,19 +86,16 @@ func TestCreateOrganisationFolderStructures(t *testing.T) {
 	t.Logf("Generated cluster definitions %s", clusterDefinitions)
 
 	testDir1 := path.Join(dir, "clusters", "foo", "terraform")
-	exists, err := util.FileExists(testDir1)
-	assert.NoError(t, err)
-	assert.True(t, exists, "Directory clusters/foo/terraform should exist")
+	_, err = os.Stat(testDir1)
+	require.NoError(t, err)
 
 	testDir1NoGit := path.Join(testDir1, ".git")
-	exists, err = util.FileExists(testDir1NoGit)
-	assert.NoError(t, err)
-	assert.False(t, exists, "Directory clusters/foo/terraform/.git should not exist")
+	_, err = os.Stat(testDir1NoGit)
+	require.True(t, os.IsNotExist(err))
 
 	testDir2 := path.Join(dir, "clusters", "bar", "terraform")
-	exists, err = util.FileExists(testDir2)
-	assert.NoError(t, err)
-	assert.True(t, exists, "Directory clusters/bar/terraform should exist")
+	_, err = os.Stat(testDir2)
+	require.NoError(t, err)
 
 	gitignore, err := util.LoadBytes(dir, ".gitignore")
 	assert.NotEmpty(t, gitignore, ".gitignore not found")

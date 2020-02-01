@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/jenkins-x/jx/pkg/cmd/create/options"
@@ -124,21 +125,22 @@ func (o *CreateAddonIngressControllerOptions) createPullRequestForDomain(gitRepo
 
 func (o *CreateAddonIngressControllerOptions) modifyDomainInValuesFiles(dir string, domain string) error {
 	fileName := filepath.Join(dir, "env", "values.yaml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return err
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		return errors.Errorf("Could not find helm file in cloned environment git repository: %s", fileName)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
-	if !exists {
-		return fmt.Errorf("Could not find helm file in cloned environment git repository: %s", fileName)
-	}
+
 	data, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to load helm values file %s", fileName)
 	}
+
 	values, err := helm.LoadValues(data)
 	if err != nil {
 		return errors.Wrapf(err, "failed to parse helm values file %s", fileName)
 	}
+
 	util.SetMapValueViaPath(values, "expose.config.domain", domain)
 
 	err = helm.SaveFile(fileName, values)

@@ -246,20 +246,12 @@ func (o *DeleteBranchOptions) cloneOrPullRepository(org string, repo string, git
 	dir := filepath.Join(environmentsDir, org, repo)
 
 	// now lets clone the fork and push it...
-	exists, err := util.FileExists(dir)
-	if err != nil {
+	_, err = os.Stat(dir)
+	if err != nil && !os.IsNotExist(err) {
 		return dir, err
 	}
 
-	if exists {
-		// lets check the git remote URL is setup correctly
-		err = o.Git().SetRemoteURL(dir, "origin", gitURL)
-		if err != nil {
-			return dir, err
-		}
-		err = o.Git().StashPush(dir)
-		return dir, err
-	} else {
+	if os.IsNotExist(err) {
 		err := os.MkdirAll(dir, util.DefaultWritePermissions)
 		if err != nil {
 			return dir, fmt.Errorf("Failed to create directory %s due to %s", dir, err)
@@ -276,4 +268,11 @@ func (o *DeleteBranchOptions) cloneOrPullRepository(org string, repo string, git
 		}
 		return dir, err
 	}
+	// lets check the git remote URL is setup correctly
+	err = o.Git().SetRemoteURL(dir, "origin", gitURL)
+	if err != nil {
+		return dir, err
+	}
+	err = o.Git().StashPush(dir)
+	return dir, err
 }

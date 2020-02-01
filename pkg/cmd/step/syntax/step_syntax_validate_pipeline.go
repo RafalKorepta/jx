@@ -92,12 +92,10 @@ func (o *StepSyntaxValidatePipelineOptions) Run() error {
 	}
 
 	pipelineFile := filepath.Join(dir, pipelineFileName)
-	fileExists, err := util.FileExists(pipelineFile)
-	if err != nil {
-		return errors.Wrapf(err, "error reading pipeline file %s", pipelineFile)
-	}
-	if !fileExists {
-		return fmt.Errorf("pipeline file %s does not exist or is not a file", pipelineFile)
+	if _, err := os.Stat(pipelineFile); os.IsNotExist(err) {
+		return errors.Errorf("pipeline file %s does not exist or is not a file", pipelineFile)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", pipelineFile)
 	}
 
 	data, err := ioutil.ReadFile(pipelineFile)

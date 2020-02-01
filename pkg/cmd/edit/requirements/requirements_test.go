@@ -63,6 +63,7 @@ func TestCmdEditRequirements(t *testing.T) {
 				assert.Equal(t, "gs://foo", req.Storage.Logs.URL, "req.Storage.Logs.URL")
 				assert.True(t, req.Storage.Logs.Enabled, "req.Storage.Logs.Enabled")
 			},
+			fail: true,
 		},
 		{
 			name: "bad-git-kind",

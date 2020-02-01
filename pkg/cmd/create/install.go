@@ -1006,11 +1006,11 @@ func (options *InstallOptions) installPlatformGitOpsMode(gitOpsEnvDir string, gi
 	}
 
 	// lets handle if the requirements.yaml already exists we may have added some initial apps like prow etc
-	exists, err := util.FileExists(requirementsFile)
-	if err != nil {
+	_, err := os.Stat(requirementsFile)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if exists {
+	if err == nil {
 		requirements, err = helm.LoadRequirementsFile(requirementsFile)
 		if err != nil {
 			return errors.Wrapf(err, "failed to load helm requirements file %s", requirementsFile)
@@ -1062,11 +1062,11 @@ func (options *InstallOptions) installPlatformGitOpsMode(gitOpsEnvDir string, gi
 	}
 
 	// lets load any existing values.yaml data as we may have created this via additional apps like Prow
-	exists, err = util.FileExists(valuesFile)
-	if err != nil {
+	_, err = os.Stat(valuesFile)
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if exists {
+	if err == nil {
 		currentValues, err := chartutil.ReadValuesFile(valuesFile)
 		if err != nil {
 			return err
@@ -1538,8 +1538,8 @@ func (options *InstallOptions) buildGitRepositoryOptionsForEnvironments() (*gits
 
 func (options *InstallOptions) cleanupTempFiles(temporaryFiles []string) error {
 	for _, tempFile := range temporaryFiles {
-		exists, err := util.FileExists(tempFile)
-		if exists && err == nil {
+		_, err := os.Stat(tempFile)
+		if err == nil {
 			err := util.DestroyFile(tempFile)
 			if err != nil {
 				return errors.Wrapf(err, "removing temporary file '%s'", tempFile)
@@ -2133,14 +2133,14 @@ func (options *InstallOptions) getAdminSecrets(configStore configio.ConfigStore,
 	if _, err := os.Stat(providerEnvDir); os.IsNotExist(err) {
 		return "", nil, fmt.Errorf("cloud environment dir %s not found", providerEnvDir)
 	}
-	sopsFileExists, err := util.FileExists(cloudEnvironmentSopsLocation)
-	if err != nil {
+	_, err := os.Stat(cloudEnvironmentSopsLocation)
+	if err != nil && !os.IsNotExist(err) {
 		return "", nil, errors.Wrap(err, "failed to look for "+cloudEnvironmentSopsLocation)
 	}
 
 	adminSecretsServiceInit := false
 
-	if sopsFileExists {
+	if err == nil {
 		log.Logger().Infof("Attempting to decrypt secrets file %s", util.ColorInfo(cloudEnvironmentSecretsLocation))
 		// need to decrypt secrets now
 		err = options.Helm().DecryptSecrets(cloudEnvironmentSecretsLocation)
@@ -2149,12 +2149,12 @@ func (options *InstallOptions) getAdminSecrets(configStore configio.ConfigStore,
 		}
 
 		cloudEnvironmentSecretsDecryptedLocation := filepath.Join(providerEnvDir, opts.CloudEnvSecretsFile+".dec")
-		decryptedSecretsFile, err := util.FileExists(cloudEnvironmentSecretsDecryptedLocation)
-		if err != nil {
+		_, err := os.Stat(cloudEnvironmentSecretsDecryptedLocation)
+		if err != nil && !os.IsNotExist(err) {
 			return "", nil, errors.Wrap(err, "failed to look for "+cloudEnvironmentSecretsDecryptedLocation)
 		}
 
-		if decryptedSecretsFile {
+		if !os.IsNotExist(err) {
 			log.Logger().Infof("Successfully decrypted %s", util.ColorInfo(cloudEnvironmentSecretsDecryptedLocation))
 			cloudEnvironmentSecretsLocation = cloudEnvironmentSecretsDecryptedLocation
 
@@ -2883,11 +2883,12 @@ func gitOpsModifyConfigMap(dir string, name string, defaultResource *core_v1.Con
 	callback func(configMap *core_v1.ConfigMap) error) (*core_v1.ConfigMap, error) {
 	answer := core_v1.ConfigMap{}
 	fileName := filepath.Join(dir, name+"-configmap.yaml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return &answer, errors.Wrapf(err, "Could not check if file exists %s", fileName)
+	_, err := os.Stat(fileName)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
-	if exists {
+
+	if err == nil {
 		err = configStore.ReadObject(fileName, &answer)
 		if err != nil {
 			return &answer, errors.Wrapf(err, "Failed to unmarshall YAML file %s", fileName)
@@ -2922,11 +2923,11 @@ func gitOpsModifySecret(dir string, name string, defaultResource *core_v1.Secret
 	callback func(secret *core_v1.Secret) error) (*core_v1.Secret, error) {
 	answer := core_v1.Secret{}
 	fileName := filepath.Join(dir, name+"-secret.yaml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
+	_, err := os.Stat(fileName)
+	if err != nil && !os.IsNotExist(err) {
 		return &answer, errors.Wrapf(err, "checking if file exists %s", fileName)
 	}
-	if exists {
+	if err == nil {
 		// lets unmarshall the data
 		err = configStore.ReadObject(fileName, &answer)
 		if err != nil {
@@ -2959,11 +2960,11 @@ func gitOpsModifyEnvironment(dir string, name string, defaultEnvironment *v1.Env
 	callback func(*v1.Environment) error) (*v1.Environment, error) {
 	answer := v1.Environment{}
 	fileName := filepath.Join(dir, name+"-env.yaml")
-	exists, err := util.FileExists(fileName)
-	if err != nil {
+	_, err := os.Stat(fileName)
+	if err != nil && !os.IsNotExist(err) {
 		return &answer, errors.Wrapf(err, "Could not check if file exists %s", fileName)
 	}
-	if exists {
+	if err == nil {
 		// lets unmarshal the data
 		err := configStore.ReadObject(fileName, &answer)
 		if err != nil {
@@ -3388,11 +3389,11 @@ func (options *InstallOptions) setValuesFileValue(fileName string, key string, v
 	answerMap := map[string]interface{}{}
 
 	// lets load any previous values if they exist
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return err
+	_, err = os.Stat(fileName)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", fileName)
 	}
-	if exists {
+	if err == nil {
 		answerMap, err = helm.LoadValuesFile(fileName)
 		if err != nil {
 			return err

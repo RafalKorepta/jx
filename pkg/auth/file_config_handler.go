@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/jenkins-x/jx/pkg/util"
@@ -47,11 +48,11 @@ func (s *FileAuthConfigHandler) loadFileAuth(fileName string) (*AuthConfig, erro
 	if fileName == "" {
 		return nil, fmt.Errorf("empty file name for auth config")
 	}
-	exists, err := util.FileExists(fileName)
-	if err != nil {
-		return nil, fmt.Errorf("checking if the auth config file exists %s due to %s", fileName, err)
+	_, err := os.Stat(fileName)
+	if err != nil && os.IsNotExist(err) {
+		return nil, errors.Wrapf(err, "failed to check if file %s exists", fileName)
 	}
-	if !exists {
+	if os.IsNotExist(err) {
 		return nil, fmt.Errorf("auth config file %q does not exist", fileName)
 	}
 	data, err := ioutil.ReadFile(fileName)

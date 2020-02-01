@@ -1,9 +1,10 @@
 package helm
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	"github.com/jenkins-x/jx/pkg/builds"
 
@@ -72,24 +73,23 @@ func (o *StepHelmVersionOptions) Run() error {
 		version = builds.GetBuildNumber()
 	}
 	if version == "" {
-		return fmt.Errorf("no version specified and could not detect the build number via $BUILD_NUMBER")
+		return errors.Errorf("no version specified and could not detect the build number via $BUILD_NUMBER")
 	}
 	var err error
 	dir := o.Dir
 	if dir == "" {
 		dir, err = os.Getwd()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "could not find root path name to the current directory")
 		}
 	}
 	chartFile := filepath.Join(dir, "Chart.yaml")
-	exists, err := util.FileExists(chartFile)
-	if err != nil {
-		return err
+	if _, err = os.Stat(chartFile); os.IsNotExist(err) {
+		return errors.Errorf("no chart exists at %s", chartFile)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", chartFile)
 	}
-	if !exists {
-		return fmt.Errorf("no chart exists at %s", chartFile)
-	}
+
 	err = helm.SetChartVersion(chartFile, version)
 	if err != nil {
 		return err

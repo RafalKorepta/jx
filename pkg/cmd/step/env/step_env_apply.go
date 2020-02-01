@@ -1,7 +1,6 @@
 package env
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -116,30 +115,28 @@ func (o *StepEnvApplyOptions) Run() error {
 	if err != nil {
 		return errors.Wrap(err, "creating the API extensions client")
 	}
-	kube.RegisterAllCRDs(apisClient)
+
+	err = kube.RegisterAllCRDs(apisClient)
 	if err != nil {
 		return errors.Wrap(err, "registering all CRDs")
 	}
 
 	// now lets find the dev environment to know what kind of helmer to use
 	chartFile := filepath.Join(dir, helm.ChartFileName)
-	exists, err := util.FileExists(chartFile)
-	if err != nil {
-		return errors.Wrap(err, "checking if file exits")
-	}
-	if !exists {
+	if _, err := os.Stat(chartFile); os.IsNotExist(err) {
 		envDir := filepath.Join(dir, "env")
-		chartFile2 := filepath.Join(envDir, helm.ChartFileName)
-		exists2, err := util.FileExists(chartFile2)
-		if exists2 && err == nil {
-			dir = envDir
-		} else {
-			return fmt.Errorf("there is no Environment chart file at %s or %s\nplease try specify the directory containing the Chart.yaml or env/Chart.yaml with --dir", chartFile, chartFile2)
+		chartFileInEnvDir := filepath.Join(envDir, helm.ChartFileName)
+		if _, err = os.Stat(chartFileInEnvDir); err != nil {
+			return errors.Errorf("there is no Environment chart file at %s or %s\nplease try specify the directory containing the Chart.yaml or env/Chart.yaml with --dir", chartFile, chartFileInEnvDir)
 		}
+		dir = envDir
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", chartFile)
 	}
+
 	devEnvFile := filepath.Join(dir, "templates", "dev-env.yaml")
-	exists, err = util.FileExists(chartFile)
-	if exists && err == nil {
+	_, err = os.Stat(chartFile)
+	if err == nil {
 		// lets setup the Helmer based on the current settings
 		log.Logger().Infof("Loading the latest Dev Environment configuration from %s", devEnvFile)
 
@@ -185,7 +182,7 @@ func (o *StepEnvApplyOptions) Run() error {
 	if o.ChangeNs {
 		_, currentNs, err := o.KubeClientAndNamespace()
 		if err != nil {
-			errors.Wrap(err, "creating the kube client")
+			return errors.Wrap(err, "creating the kube client")
 		}
 		if currentNs != ns {
 			nsOptions := &namespace.NamespaceOptions{

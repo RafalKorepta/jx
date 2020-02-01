@@ -227,7 +227,8 @@ func (o *CreateAddonIstioOptions) getIstioChartsFromGitHub() (string, error) {
 	clientURL := fmt.Sprintf("https://github.com/istio/istio/releases/download/%s/istio-%s-%s", actualVersion, actualVersion, extension)
 
 	outputDir := filepath.Join(cacheDir, "istio-"+actualVersion.String())
-	os.RemoveAll(outputDir)
+	err = os.RemoveAll(outputDir)
+	log.Logger().Warn(errors.Wrapf(err, "unexpected error occurred while %s dir was removing", outputDir))
 
 	answer = outputDir
 
@@ -243,9 +244,9 @@ func (o *CreateAddonIstioOptions) getIstioChartsFromGitHub() (string, error) {
 		if err != nil {
 			return answer, err
 		}
-	} else {
-		log.Logger().Infof("Istio package already downloaded: %s", tarPath)
 	}
+
+	log.Logger().Infof("Istio package already downloaded: %s", tarPath)
 
 	if strings.HasSuffix(extension, ".zip") {
 		err = util.Unzip(tarPath, cacheDir)
@@ -259,17 +260,21 @@ func (o *CreateAddonIstioOptions) getIstioChartsFromGitHub() (string, error) {
 		}
 	}
 	f := filepath.Join(outputDir, "bin", binaryFile)
-	exists, err := util.FileExists(f)
-	if err != nil {
-		return answer, err
+	if _, err = os.Stat(f); os.IsNotExist(err) {
+		return answer, nil
+	} else if err != nil {
+		return answer, errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", f)
 	}
-	if exists {
-		binaryDest := filepath.Join(binDir, binaryFile)
-		os.Remove(binaryDest)
-		err = os.Rename(f, binaryDest)
-		if err != nil {
-			return answer, err
-		}
+
+	binaryDest := filepath.Join(binDir, binaryFile)
+	err = os.Remove(binaryDest)
+	if err != nil {
+		return answer, errors.Wrap(err, "removing istioctl binary")
+	}
+
+	err = os.Rename(f, binaryDest)
+	if err != nil {
+		return answer, errors.Wrap(err, "renaming istioctl binary")
 	}
 	return answer, nil
 }

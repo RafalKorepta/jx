@@ -3,6 +3,7 @@ package auth
 import (
 	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/jenkins-x/jx/pkg/log"
@@ -19,12 +20,10 @@ func loadGitCredentialsAuth() (*AuthConfig, error) {
 
 // loadGitCredentialsAuthFile loads the git credentials file
 func loadGitCredentialsAuthFile(fileName string) (*AuthConfig, error) {
-	exists, err := util.FileExists(fileName)
+	//TODO check what tha heck AuthConfig can be nil. Why?
+	_, err := os.Stat(fileName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to check if git credentials file exists %s", fileName)
-	}
-	if !exists {
-		return nil, nil
+		return nil, errors.Wrapf(err, "failed to check if git credentials file %s exists", fileName)
 	}
 
 	data, err := ioutil.ReadFile(fileName)

@@ -318,20 +318,12 @@ func (o *ControllerBackupOptions) getOrCreateBackupRepository() (string, error) 
 		fmt.Fprintf(o.Out, "Git repository %s/%s already exists\n", util.ColorInfo(owner), util.ColorInfo(repoName))
 
 		dir = path.Join(backupDir, details.RepoName)
-		localDirExists, err := util.FileExists(dir)
-		if err != nil {
+		_, err := os.Stat(dir)
+		if err != nil && !os.IsNotExist(err) {
 			return "", err
 		}
 
-		if localDirExists {
-			// if remote repo does exist & local does exist, git pull the local repo
-			fmt.Fprintf(o.Out, "local directory already exists\n")
-
-			err = o.Git().Pull(dir)
-			if err != nil {
-				return "", err
-			}
-		} else {
+		if os.IsNotExist(err) {
 			fmt.Fprintf(o.Out, "cloning repository locally\n")
 			err = os.MkdirAll(dir, os.FileMode(0755))
 			if err != nil {
@@ -349,6 +341,15 @@ func (o *ControllerBackupOptions) getOrCreateBackupRepository() (string, error) 
 				return "", err
 			}
 		}
+		// if remote repo does exist & local does exist, git pull the local repo
+		//TODO fmt replace with log
+		fmt.Fprintf(o.Out, "local directory already exists\n")
+
+		err = o.Git().Pull(dir)
+		if err != nil {
+			return "", err
+		}
+
 	}
 
 	return dir, nil

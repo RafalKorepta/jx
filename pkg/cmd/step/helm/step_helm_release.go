@@ -94,13 +94,12 @@ func (o *StepHelmReleaseOptions) Run() error {
 		return fmt.Errorf("Could not find version in chart %s", chartFile)
 	}
 	tarball := fmt.Sprintf("%s-%s.tgz", name, version)
-	exists, err := util.FileExists(tarball)
-	if err != nil {
-		return errors.Wrapf(err, "don't find the chart archive '%s'", tarball)
+	if _, err = os.Stat(tarball); os.IsNotExist(err) {
+		return errors.Wrapf(err, "Generated helm file %s does not exist!", tarball)
+	} else if err != nil {
+		return errors.Wrapf(err, "unexpected error occurred while checking if chart archive %s exists", tarball)
 	}
-	if !exists {
-		return fmt.Errorf("Generated helm file %s does not exist!", tarball)
-	}
+
 	defer os.Remove(tarball)
 
 	chartRepo := o.ReleaseChartRepositoryURL()

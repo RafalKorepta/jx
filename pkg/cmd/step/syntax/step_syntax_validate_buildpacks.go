@@ -3,6 +3,7 @@ package syntax
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -82,25 +83,26 @@ func (o *StepSyntaxValidateBuildPacksOptions) Run() error {
 		for _, file := range packs {
 			if file.IsDir() {
 				yamlFile := filepath.Join(packsDir, file.Name(), jenkinsfile.PipelineConfigFileName)
-				exists, err := util.FileExists(yamlFile)
+				if _, err := os.Stat(yamlFile); os.IsNotExist(err) {
+					continue
+				} else if err != nil {
+					return errors.Wrapf(err, "unexpected error occurred while checking if file %s exists", yamlFile)
+				}
+
+				data, err := ioutil.ReadFile(yamlFile)
 				if err != nil {
-					return errors.Wrapf(err, "error reading %s", yamlFile)
+					return errors.Wrapf(err, "Failed to load file %s", yamlFile)
 				}
-				if exists {
-					data, err := ioutil.ReadFile(yamlFile)
-					if err != nil {
-						return errors.Wrapf(err, "Failed to load file %s", yamlFile)
-					}
-					validationErrors, err := util.ValidateYaml(&jenkinsfile.PipelineConfig{}, data)
-					if err != nil {
-						return errors.Wrapf(err, "failed to validate YAML file %s", yamlFile)
-					}
-					packID := fmt.Sprintf("%s: %s", repo, file.Name())
-					packNames = append(packNames, packID)
-					if len(validationErrors) > 0 {
-						errorsByPack[packID] = validationErrors
-					}
+				validationErrors, err := util.ValidateYaml(&jenkinsfile.PipelineConfig{}, data)
+				if err != nil {
+					return errors.Wrapf(err, "failed to validate YAML file %s", yamlFile)
 				}
+				packID := fmt.Sprintf("%s: %s", repo, file.Name())
+				packNames = append(packNames, packID)
+				if len(validationErrors) > 0 {
+					errorsByPack[packID] = validationErrors
+				}
+
 			}
 		}
 	}
