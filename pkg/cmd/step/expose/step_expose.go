@@ -9,6 +9,15 @@ import (
 	"text/template"
 
 	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/helm/pkg/chartutil"
+
 	"github.com/jenkins-x/jx/pkg/cmd/helper"
 	"github.com/jenkins-x/jx/pkg/cmd/opts"
 	"github.com/jenkins-x/jx/pkg/cmd/templates"
@@ -18,14 +27,6 @@ import (
 	"github.com/jenkins-x/jx/pkg/kube/services"
 	"github.com/jenkins-x/jx/pkg/log"
 	"github.com/jenkins-x/jx/pkg/util"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/helm/pkg/chartutil"
 )
 
 var (
@@ -107,7 +108,8 @@ func (o *StepExposeOptions) Run() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to load requirements YAML")
 	}
-	if requirements.Cluster.Namespace == "" {
+
+	if o.Namespace != "" {
 		requirements.Cluster.Namespace = ns
 	}
 
@@ -335,8 +337,8 @@ func (o *StepExposeOptions) loadExposeControllerConfigFromValuesYAML(requirement
 	}
 
 	// lets populate the sub domain if its missing
-	if ic.NamespaceSubDomain == "" {
-		ic.NamespaceSubDomain = "-" + requirements.Cluster.Namespace + "."
+	if o.Namespace != "" {
+		ic.NamespaceSubDomain = "-" + o.Namespace + "."
 	}
 	return nil
 }
